@@ -1,0 +1,54 @@
+.group-page {
+  min-height: 100vh;
+  background-color: #f8f9fa;
+}
+
+.group-header {
+  background: linear-gradient(135deg, #6f42c1 0%, #e83e8c 100%);
+  color: white;
+  padding: 30px 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.group-header .container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.group-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 600;
+}
+
+.back-link {
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  transition: all 0.2s ease;
+}
+
+.back-link:hover {
+  background: rgba(255, 255, 255, 0.3);
+  color: white;
+}
+
+.group-main {
+  padding: 30px 0;
+}
+
+@media (max-width: 768px) {
+  .group-header .container {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+  }
+  
+  .group-header h1 {
+    font-size: 1.5rem;
+  }
+}
