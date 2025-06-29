@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { login } from '../services/authService';
 import '../styles/LoginPage.css';
 
-const LoginPage: React.FC = () => {
+const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -25,7 +25,7 @@ const LoginPage: React.FC = () => {
       } else {
         navigate('/teacher');
       }
-    } catch (error: any) {
+    } catch (error) {
       setError('Email yoki parol noto\'g\'ri');
     }
     

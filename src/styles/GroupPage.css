@@ -1,12 +1,13 @@
+/* GroupPage Styles */
 .group-page {
   min-height: 100vh;
-  background-color: #f8f9fa;
+  background: #f8f9fa;
 }
 
 .group-header {
-  background: linear-gradient(135deg, #6f42c1 0%, #e83e8c 100%);
+  background: linear-gradient(135deg, #007bff 0%, #6610f2 100%);
   color: white;
-  padding: 30px 0;
+  padding: 20px 0;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
@@ -18,27 +19,27 @@
 
 .group-header h1 {
   margin: 0;
-  font-size: 2rem;
-  font-weight: 600;
-}
-
-.back-link {
-  color: white;
-  text-decoration: none;
-  font-weight: 500;
-  padding: 8px 16px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.2);
-  transition: all 0.2s ease;
-}
-
-.back-link:hover {
-  background: rgba(255, 255, 255, 0.3);
-  color: white;
+  font-size: 1.8rem;
 }
 
 .group-main {
   padding: 30px 0;
+}
+
+.back-link {
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: none;
+  font-size: 14px;
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 20px;
+  transition: all 0.3s ease;
+}
+
+.back-link:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+  text-decoration: none;
 }
 
 @media (max-width: 768px) {
@@ -46,9 +47,5 @@
     flex-direction: column;
     gap: 15px;
     text-align: center;
-  }
-  
-  .group-header h1 {
-    font-size: 1.5rem;
   }
 }

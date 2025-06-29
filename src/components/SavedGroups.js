@@ -1,21 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSavedGroups, removeSavedGroup } from '../utils/localStorage';
-import { SavedGroup } from '../types';
 
-const SavedGroups: React.FC = () => {
-  const [savedGroups, setSavedGroups] = useState<SavedGroup[]>([]);
+const SavedGroups = () => {
+  const [savedGroups, setSavedGroups] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
     setSavedGroups(getSavedGroups());
   }, []);
 
-  const handleGroupClick = (code: string) => {
+  const handleGroupClick = (code) => {
     navigate(`/group/${code}`);
   };
 
-  const handleRemoveGroup = (code: string, e: React.MouseEvent) => {
+  const handleRemoveGroup = (code, e) => {
     e.stopPropagation();
     removeSavedGroup(code);
     setSavedGroups(getSavedGroups());

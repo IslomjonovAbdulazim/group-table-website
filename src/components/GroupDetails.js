@@ -1,19 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { GroupInfo, ModuleInfo, LeaderboardEntry } from '../types';
 import { getGroupByCode, getGroupModules, getModuleLeaderboard } from '../services/groupService';
 import { saveGroup, isGroupSaved, removeSavedGroup } from '../utils/localStorage';
 import StudentChart from './StudentChart';
 
-interface GroupDetailsProps {
-  code: string;
-}
-
-const GroupDetails: React.FC<GroupDetailsProps> = ({ code }) => {
-  const [group, setGroup] = useState<GroupInfo | null>(null);
-  const [modules, setModules] = useState<ModuleInfo[]>([]);
-  const [selectedModule, setSelectedModule] = useState<ModuleInfo | null>(null);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [selectedStudent, setSelectedStudent] = useState<LeaderboardEntry | null>(null);
+const GroupDetails = ({ code }) => {
+  const [group, setGroup] = useState(null);
+  const [modules, setModules] = useState([]);
+  const [selectedModule, setSelectedModule] = useState(null);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [selectedStudent, setSelectedStudent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showChart, setShowChart] = useState(false);
@@ -73,7 +68,7 @@ const GroupDetails: React.FC<GroupDetailsProps> = ({ code }) => {
     }
   };
 
-  const handleStudentClick = (student: LeaderboardEntry) => {
+  const handleStudentClick = (student) => {
     setSelectedStudent(student);
     setShowChart(true);
   };

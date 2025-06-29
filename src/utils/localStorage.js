@@ -1,8 +1,6 @@
-import { SavedGroup } from '../types';
-
 const SAVED_GROUPS_KEY = 'grouptable_saved_groups';
 
-export const getSavedGroups = (): SavedGroup[] => {
+export const getSavedGroups = () => {
   try {
     const saved = localStorage.getItem(SAVED_GROUPS_KEY);
     return saved ? JSON.parse(saved) : [];
@@ -11,11 +9,11 @@ export const getSavedGroups = (): SavedGroup[] => {
   }
 };
 
-export const saveGroup = (code: string, name: string): void => {
+export const saveGroup = (code, name) => {
   const savedGroups = getSavedGroups();
   const existingIndex = savedGroups.findIndex(group => group.code === code);
   
-  const newGroup: SavedGroup = {
+  const newGroup = {
     code,
     name,
     savedAt: new Date().toISOString()
@@ -32,13 +30,13 @@ export const saveGroup = (code: string, name: string): void => {
   localStorage.setItem(SAVED_GROUPS_KEY, JSON.stringify(limitedGroups));
 };
 
-export const removeSavedGroup = (code: string): void => {
+export const removeSavedGroup = (code) => {
   const savedGroups = getSavedGroups();
   const filteredGroups = savedGroups.filter(group => group.code !== code);
   localStorage.setItem(SAVED_GROUPS_KEY, JSON.stringify(filteredGroups));
 };
 
-export const isGroupSaved = (code: string): boolean => {
+export const isGroupSaved = (code) => {
   const savedGroups = getSavedGroups();
   return savedGroups.some(group => group.code === code);
 };

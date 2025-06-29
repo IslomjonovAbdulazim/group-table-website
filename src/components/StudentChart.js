@@ -10,7 +10,6 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
-import { ChartData } from '../types';
 import { getStudentChart } from '../services/groupService';
 
 ChartJS.register(
@@ -23,14 +22,8 @@ ChartJS.register(
   Legend
 );
 
-interface StudentChartProps {
-  groupCode: string;
-  studentId: number;
-  studentName: string;
-}
-
-const StudentChart: React.FC<StudentChartProps> = ({ groupCode, studentId, studentName }) => {
-  const [chartData, setChartData] = useState<ChartData | null>(null);
+const StudentChart = ({ groupCode, studentId, studentName }) => {
+  const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -115,12 +108,12 @@ const StudentChart: React.FC<StudentChartProps> = ({ groupCode, studentId, stude
         text: `${studentName} - Reyting o'zgarishi`,
         font: {
           size: 16,
-          weight: 'bold' as const,
+          weight: 'bold',
         },
       },
       tooltip: {
         callbacks: {
-          label: function(context: any) {
+          label: function(context) {
             const actualPosition = maxPosition - context.parsed.y + 1;
             const changeData = chartData.positions[context.dataIndex];
             let changeText = '';
@@ -143,7 +136,7 @@ const StudentChart: React.FC<StudentChartProps> = ({ groupCode, studentId, stude
           text: 'Reyting pozitsiyasi',
         },
         ticks: {
-          callback: function(value: any) {
+          callback: function(value) {
             const actualPosition = maxPosition - value + 1;
             return `#${actualPosition}`;
           },

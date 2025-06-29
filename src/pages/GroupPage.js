@@ -3,8 +3,8 @@ import { useParams } from 'react-router-dom';
 import GroupDetails from '../components/GroupDetails';
 import '../styles/GroupPage.css';
 
-const GroupPage: React.FC = () => {
-  const { code } = useParams<{ code: string }>();
+const GroupPage = () => {
+  const { code } = useParams();
 
   return (
     <div className="group-page">

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Group, Student, Module, Lesson, Criteria, LeaderboardEntry } from '../types';
 import { 
   getGroups, createGroup, updateGroup, deleteGroup, finishGroup,
   getStudents, createStudent, updateStudent, deleteStudent,
@@ -9,20 +8,15 @@ import {
   createGrade, getLeaderboard
 } from '../services/groupService';
 
-interface BulkGrade {
-  studentId: number;
-  points: number;
-}
-
-const GroupManager: React.FC = () => {
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [modules, setModules] = useState<Module[]>([]);
-  const [selectedModule, setSelectedModule] = useState<Module | null>(null);
-  const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [criteria, setCriteria] = useState<Criteria[]>([]);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+const GroupManager = () => {
+  const [groups, setGroups] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [students, setStudents] = useState([]);
+  const [modules, setModules] = useState([]);
+  const [selectedModule, setSelectedModule] = useState(null);
+  const [lessons, setLessons] = useState([]);
+  const [criteria, setCriteria] = useState([]);
+  const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
   
   // Form states
@@ -30,14 +24,14 @@ const GroupManager: React.FC = () => {
   const [showStudentForm, setShowStudentForm] = useState(false);
   const [showCriteriaForm, setShowCriteriaForm] = useState(false);
   const [showGradingPanel, setShowGradingPanel] = useState(false);
-  const [selectedGradingType, setSelectedGradingType] = useState<'bulk' | 'one_by_one'>('bulk');
-  const [selectedCriteria, setSelectedCriteria] = useState<Criteria | null>(null);
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [selectedGradingType, setSelectedGradingType] = useState('bulk');
+  const [selectedCriteria, setSelectedCriteria] = useState(null);
+  const [selectedStudent, setSelectedStudent] = useState(null);
   
   const [groupName, setGroupName] = useState('');
   const [studentName, setStudentName] = useState('');
   const [criteriaData, setCriteriaData] = useState({ name: '', max_points: 10, grading_method: 'bulk' });
-  const [bulkGrades, setBulkGrades] = useState<BulkGrade[]>([]);
+  const [bulkGrades, setBulkGrades] = useState([]);
   const [oneByOnePoints, setOneByOnePoints] = useState(0);
 
   useEffect(() => {
@@ -110,7 +104,7 @@ const GroupManager: React.FC = () => {
     }
   };
 
-  const handleCreateGroup = async (e: React.FormEvent) => {
+  const handleCreateGroup = async (e) => {
     e.preventDefault();
     try {
       await createGroup(groupName);
@@ -122,7 +116,7 @@ const GroupManager: React.FC = () => {
     }
   };
 
-  const handleCreateStudent = async (e: React.FormEvent) => {
+  const handleCreateStudent = async (e) => {
     e.preventDefault();
     if (!selectedGroup) return;
     
@@ -158,7 +152,7 @@ const GroupManager: React.FC = () => {
     }
   };
 
-  const handleCreateCriteria = async (e: React.FormEvent) => {
+  const handleCreateCriteria = async (e) => {
     e.preventDefault();
     if (!selectedModule) return;
     
@@ -218,7 +212,7 @@ const GroupManager: React.FC = () => {
     }
   };
 
-  const openGradingPanel = (criteria: Criteria, type: 'bulk' | 'one_by_one') => {
+  const openGradingPanel = (criteria, type) => {
     setSelectedCriteria(criteria);
     setSelectedGradingType(type);
     setShowGradingPanel(true);
@@ -433,7 +427,7 @@ const GroupManager: React.FC = () => {
                           <div className="criteria-actions">
                             <button 
                               className="btn btn-success"
-                              onClick={() => openGradingPanel(crit, crit.grading_method as any)}
+                              onClick={() => openGradingPanel(crit, crit.grading_method)}
                             >
                               Baholash
                             </button>

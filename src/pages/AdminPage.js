@@ -5,7 +5,7 @@ import TeacherManager from '../components/TeacherManager';
 import AccountSettings from '../components/AccountSettings';
 import '../styles/AdminPage.css';
 
-const AdminPage: React.FC = () => {
+const AdminPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {

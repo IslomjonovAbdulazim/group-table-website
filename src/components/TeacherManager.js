@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Teacher, TeacherCreate, TeacherUpdate, TeacherStats } from '../types';
 import { getTeachers, createTeacher, updateTeacher, deleteTeacher, getTeacherStats } from '../services/groupService';
 import { changeTeacherPassword } from '../services/authService';
 
-const TeacherManager: React.FC = () => {
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+const TeacherManager = () => {
+  const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
-  const [formData, setFormData] = useState<TeacherCreate>({ name: '', email: '', password: '' });
-  const [stats, setStats] = useState<{[key: number]: TeacherStats}>({});
+  const [editingTeacher, setEditingTeacher] = useState(null);
+  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [stats, setStats] = useState({});
 
   useEffect(() => {
     loadTeachers();
@@ -21,7 +20,7 @@ const TeacherManager: React.FC = () => {
       setTeachers(data);
       
       // Load stats for each teacher
-      const statsData: {[key: number]: TeacherStats} = {};
+      const statsData = {};
       for (const teacher of data) {
         try {
           statsData[teacher.id] = await getTeacherStats(teacher.id);
@@ -36,7 +35,7 @@ const TeacherManager: React.FC = () => {
     setLoading(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       if (editingTeacher) {
@@ -51,13 +50,13 @@ const TeacherManager: React.FC = () => {
     }
   };
 
-  const handleEdit = (teacher: Teacher) => {
+  const handleEdit = (teacher) => {
     setEditingTeacher(teacher);
     setFormData({ name: teacher.name, email: teacher.email, password: '' });
     setShowForm(true);
   };
 
-  const handleDelete = async (teacher: Teacher) => {
+  const handleDelete = async (teacher) => {
     if (window.confirm(`${teacher.name}ni o'chirmoqchimisiz?`)) {
       try {
         await deleteTeacher(teacher.id);
@@ -68,7 +67,7 @@ const TeacherManager: React.FC = () => {
     }
   };
 
-  const handlePasswordChange = async (teacherId: number) => {
+  const handlePasswordChange = async (teacherId) => {
     const newPassword = prompt('Yangi parol kiriting:');
     if (newPassword) {
       try {

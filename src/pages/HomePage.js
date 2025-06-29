@@ -3,7 +3,7 @@ import GroupSearch from '../components/GroupSearch';
 import SavedGroups from '../components/SavedGroups';
 import '../styles/HomePage.css';
 
-const HomePage: React.FC = () => {
+const HomePage = () => {
   return (
     <div className="home-page">
       <header className="home-header">

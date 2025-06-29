@@ -1,17 +1,16 @@
 import React, { useState } from 'react';
 import { changeAdminPassword } from '../services/authService';
-import { PasswordChange } from '../types';
 
-const AccountSettings: React.FC = () => {
+const AccountSettings = () => {
   const [showPasswordForm, setShowPasswordForm] = useState(false);
-  const [passwordData, setPasswordData] = useState<PasswordChange>({
+  const [passwordData, setPasswordData] = useState({
     current_password: '',
     new_password: ''
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setMessage('');

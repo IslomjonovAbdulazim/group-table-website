@@ -4,7 +4,7 @@ import { getUserType, logout } from '../services/authService';
 import GroupManager from '../components/GroupManager';
 import '../styles/TeacherPage.css';
 
-const TeacherPage: React.FC = () => {
+const TeacherPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
