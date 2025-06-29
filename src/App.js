@@ -1,52 +1,64 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './hooks/useAuth';
-import Login from './components/shared/Login';
-import Layout from './components/shared/Layout';
-import AdminPage from './pages/AdminPage';
-import TeacherPage from './pages/TeacherPage';
-import PublicPage from './pages/PublicPage';
-import Loading from './components/shared/Loading';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/common/ProtectedRoute';
+import Header from './components/common/Header';
+
+// Pages
+import LandingPage from './pages/LandingPage';
+import LoginPage from './pages/LoginPage';
+import TeacherDashboard from './pages/TeacherDashboard';
+import AdminDashboard from './pages/AdminDashboard';
+
+// Public components
+import GroupSearch from './components/public/GroupSearch';
+
+import './App.css';
 
 function App() {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return <Loading />;
-  }
-
   return (
-    <Routes>
-      {/* Public routes */}
-      <Route path="/public/:code" element={<PublicPage />} />
-      
-      {/* Auth routes */}
-      <Route 
-        path="/login" 
-        element={user ? <Navigate to={user.user_type === 'admin' ? '/admin' : '/teacher'} /> : <Login />} 
-      />
-      
-      {/* Protected routes */}
-      <Route path="/" element={user ? <Layout /> : <Navigate to="/login" />}>
-        <Route 
-          index 
-          element={<Navigate to={user?.user_type === 'admin' ? '/admin' : '/teacher'} />} 
-        />
-        <Route 
-          path="admin/*" 
-          element={user?.user_type === 'admin' ? <AdminPage /> : <Navigate to="/teacher" />} 
-        />
-        <Route 
-          path="teacher/*" 
-          element={user?.user_type === 'teacher' ? <TeacherPage /> : <Navigate to="/admin" />} 
-        />
-      </Route>
-      
-      {/* Fallback */}
-      <Route 
-        path="*" 
-        element={<Navigate to={user ? (user.user_type === 'admin' ? '/admin' : '/teacher') : '/login'} />} 
-      />
-    </Routes>
+    <AuthProvider>
+      <BrowserRouter>
+        <div className="App">
+          <Header />
+          <main className="main-content">
+            <Routes>
+              {/* Ommaviy sahifalar */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/group/:code/*" element={<GroupSearch />} />
+              
+              {/* O'qituvchi sahifalari */}
+              <Route 
+                path="/teacher/*" 
+                element={
+                  <ProtectedRoute userType="teacher">
+                    <TeacherDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              
+              {/* Admin sahifalari */}
+              <Route 
+                path="/admin/*" 
+                element={
+                  <ProtectedRoute userType="admin">
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              
+              {/* 404 sahifa */}
+              <Route path="*" element={
+                <div className="not-found">
+                  <h2>Sahifa topilmadi</h2>
+                  <p>Siz qidirayotgan sahifa mavjud emas.</p>
+                </div>
+              } />
+            </Routes>
+          </main>
+        </div>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

@@ -1,0 +1,371 @@
+/* App specific styles */
+.App {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+}
+
+/* Not found page */
+.not-found {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #666;
+}
+
+.not-found h2 {
+  color: #2563eb;
+  margin-bottom: 1rem;
+}
+
+/* Access denied */
+.access-denied {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #dc2626;
+}
+
+.access-denied h2 {
+  margin-bottom: 1rem;
+}
+
+/* Error page */
+.error-page {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.error-page h2 {
+  color: #dc2626;
+  margin-bottom: 1rem;
+}
+
+.error-page p {
+  color: #666;
+  margin-bottom: 2rem;
+}
+
+/* Group search specific */
+.group-header {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+  padding: 2rem 0;
+  margin-bottom: 0;
+}
+
+.group-header h1 {
+  margin-bottom: 0.5rem;
+}
+
+.group-code {
+  font-size: 1.1rem;
+  opacity: 0.9;
+  margin-bottom: 1rem;
+}
+
+.module-selector {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.module-selector label {
+  font-weight: 500;
+}
+
+.module-selector select {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: white;
+  padding: 0.5rem;
+  border-radius: 4px;
+}
+
+.module-selector select option {
+  background: #2563eb;
+  color: white;
+}
+
+.group-nav {
+  background: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  position: sticky;
+  top: 80px;
+  z-index: 50;
+}
+
+.group-content {
+  padding: 2rem 0;
+}
+
+/* Module manager specific */
+.active-module {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 2rem;
+}
+
+.active-module h3 {
+  color: #2563eb;
+  margin-bottom: 1rem;
+}
+
+.module-actions {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.module-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.lessons-section,
+.criteria-section {
+  background: #f9fafb;
+  padding: 1.5rem;
+  border-radius: 8px;
+}
+
+.lessons-section h4,
+.criteria-section h4 {
+  margin-bottom: 1rem;
+  color: #374151;
+}
+
+.lessons-list,
+.criteria-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.lesson-item,
+.criterion-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  padding: 1rem;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.lesson-item.active {
+  border-left: 4px solid #16a34a;
+}
+
+.criterion-item {
+  flex-direction: column;
+  align-items: start;
+  gap: 0.5rem;
+}
+
+.max-points {
+  font-size: 0.8rem;
+  color: #666;
+  margin-left: 0.5rem;
+}
+
+.grading-method {
+  font-size: 0.8rem;
+  background: #e5e7eb;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  color: #374151;
+}
+
+/* Grading panel specific */
+.grading-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.current-info {
+  display: flex;
+  gap: 2rem;
+  font-size: 0.9rem;
+}
+
+.grading-table {
+  background: white;
+  border-radius: 8px;
+  overflow-x: auto;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 2rem;
+}
+
+.grading-table table {
+  min-width: 800px;
+}
+
+.student-name {
+  font-weight: 500;
+  min-width: 150px;
+}
+
+.grade-cell {
+  min-width: 150px;
+}
+
+.grade-input-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.grade-input {
+  width: 60px;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.grade-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.leaderboard-section {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.leaderboard-table {
+  margin-top: 1rem;
+}
+
+.total-points {
+  font-weight: bold;
+  color: #2563eb;
+}
+
+/* Teacher stats specific */
+.teacher-header {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 2rem;
+}
+
+.teacher-header h2 {
+  color: #2563eb;
+  margin-bottom: 1rem;
+}
+
+.teacher-info p {
+  margin-bottom: 0.5rem;
+  color: #666;
+}
+
+.password-section {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 2rem;
+}
+
+.password-section h3 {
+  margin-bottom: 1rem;
+}
+
+.stats-section {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.stats-section h3 {
+  margin-bottom: 1rem;
+}
+
+.performance-indicators {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.performance-indicators h4 {
+  margin-bottom: 1rem;
+}
+
+.indicators-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.indicator {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: #f9fafb;
+  border-radius: 4px;
+}
+
+.indicator strong.high {
+  color: #16a34a;
+}
+
+.indicator strong.medium {
+  color: #f59e0b;
+}
+
+.indicator strong.low {
+  color: #dc2626;
+}
+
+/* Mobile responsive overrides */
+@media (max-width: 768px) {
+  .module-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .current-info {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .grade-input-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .grade-input {
+    width: 100%;
+  }
+  
+  .indicators-list {
+    grid-template-columns: 1fr;
+  }
+  
+  .module-selector {
+    flex-direction: column;
+    align-items: start;
+  }
+  
+  .module-selector select {
+    width: 100%;
+  }
+}
