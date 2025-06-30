@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getUserType } from '../services/authService';
 import {
@@ -15,6 +15,14 @@ const GroupDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [loadingStates, setLoadingStates] = useState({
+    students: false,
+    modules: false,
+    criteria: false,
+    lessons: false,
+    leaderboard: false,
+    forms: false
+  });
   const [activeTab, setActiveTab] = useState('students');
   const [group, setGroup] = useState(null);
   const [students, setStudents] = useState([]);
@@ -28,9 +36,11 @@ const GroupDetailPage = () => {
   const [showAddCriteria, setShowAddCriteria] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
   const [editingCriteria, setEditingCriteria] = useState(null);
-  const [gradingMode, setGradingMode] = useState(null); // 'bulk' or 'individual'
+  const [gradingMode, setGradingMode] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [selectedModuleForLessons, setSelectedModuleForLessons] = useState(null);
+  const [selectedModuleForCriteria, setSelectedModuleForCriteria] = useState(null); // NEW: Module selector for criteria
+  const [selectedModuleForLeaderboard, setSelectedModuleForLeaderboard] = useState(null); // NEW: Module selector for leaderboard
   const [bulkGrades, setBulkGrades] = useState({});
 
   // Form inputs
@@ -41,6 +51,49 @@ const GroupDetailPage = () => {
     grading_method: 'one_by_one'
   });
 
+  // Helper function to update loading states
+  const setLoadingState = useCallback((key, value) => {
+    setLoadingStates(prev => ({ ...prev, [key]: value }));
+  }, []);
+
+  // Memoized computed values for performance
+  const activeModule = useMemo(() => modules.find(m => m.is_active), [modules]);
+  const activeLesson = useMemo(() => lessons.find(l => l.is_active), [lessons]);
+
+  // Auto-refresh interval
+  useEffect(() => {
+    if (!loading && activeModule) {
+      const interval = setInterval(() => {
+        // Auto-refresh data every 30 seconds for active tab
+        switch (activeTab) {
+          case 'students':
+            loadStudents();
+            break;
+          case 'criteria':
+            if (selectedModuleForCriteria) {
+              loadCriteria(selectedModuleForCriteria.id);
+            }
+            break;
+          case 'lessons':
+            if (selectedModuleForLessons) {
+              loadLessons(selectedModuleForLessons.id);
+            }
+            break;
+          case 'leaderboard':
+            if (selectedModuleForLeaderboard) {
+              loadLeaderboard(selectedModuleForLeaderboard.id);
+            }
+            break;
+          case 'modules':
+            loadModules();
+            break;
+        }
+      }, 30000); // 30 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [activeTab, activeModule, selectedModuleForCriteria, selectedModuleForLessons, selectedModuleForLeaderboard, loading]);
+  
   useEffect(() => {
     const userType = getUserType();
     if (userType !== 'teacher') {
@@ -50,108 +103,124 @@ const GroupDetailPage = () => {
     loadGroupData();
   }, [id, navigate]);
 
-  const loadGroupData = async () => {
+  const loadGroupData = useCallback(async () => {
     setLoading(true);
     try {
-      // Load basic group info, students, and modules in parallel
+      // Load basic data first
       const [groupData, studentsData, modulesData] = await Promise.all([
         loadGroup(),
         loadStudents(),
         loadModules()
       ]);
 
-      // If there's an active module, load its criteria and lessons
-      const activeModule = modulesData?.find(m => m.is_active);
-      if (activeModule) {
-        setSelectedModuleForLessons(activeModule);
+      // Set active module defaults
+      const activeModuleFromData = modulesData?.find(m => m.is_active);
+      if (activeModuleFromData) {
+        setSelectedModuleForLessons(activeModuleFromData);
+        setSelectedModuleForCriteria(activeModuleFromData);
+        setSelectedModuleForLeaderboard(activeModuleFromData);
+        
+        // Load module-specific data
         await Promise.all([
-          loadCriteria(activeModule.id),
-          loadLessons(activeModule.id),
-          loadLeaderboard(activeModule.id)
+          loadCriteria(activeModuleFromData.id),
+          loadLessons(activeModuleFromData.id),
+          loadLeaderboard(activeModuleFromData.id)
         ]);
       } else if (modulesData?.length > 0) {
-        // If no active module, select the first one for lessons view
-        setSelectedModuleForLessons(modulesData[0]);
-        await loadLessons(modulesData[0].id);
+        const firstModule = modulesData[0];
+        setSelectedModuleForLessons(firstModule);
+        setSelectedModuleForCriteria(firstModule);
+        setSelectedModuleForLeaderboard(firstModule);
+        await Promise.all([
+          loadLessons(firstModule.id),
+          loadCriteria(firstModule.id),
+          loadLeaderboard(firstModule.id)
+        ]);
       }
     } catch (error) {
       console.error('Failed to load group data:', error);
       alert('Ma\'lumotlar yuklanmadi. Qaytadan urinib ko\'ring.');
     }
     setLoading(false);
-  };
+  }, [id]);
 
-  const loadGroup = async () => {
-    try {
-      const data = await getGroup(id);
-      setGroup(data);
-      return data;
-    } catch (error) {
-      console.error('Failed to load group:', error);
-      throw error;
-    }
-  };
+  const loadGroup = useCallback(async () => {
+    const data = await getGroup(id);
+    setGroup(data);
+    return data;
+  }, [id]);
 
-  const loadStudents = async () => {
+  const loadStudents = useCallback(async () => {
+    setLoadingState('students', true);
     try {
       const data = await getStudents(id);
       setStudents(data);
       return data;
     } catch (error) {
       console.error('Failed to load students:', error);
-      throw error;
+    } finally {
+      setLoadingState('students', false);
     }
-  };
+  }, [id, setLoadingState]);
 
-  const loadModules = async () => {
+  const loadModules = useCallback(async () => {
+    setLoadingState('modules', true);
     try {
       const data = await getModules(id);
       setModules(data);
       return data;
     } catch (error) {
       console.error('Failed to load modules:', error);
-      throw error;
+    } finally {
+      setLoadingState('modules', false);
     }
-  };
+  }, [id, setLoadingState]);
 
-  const loadCriteria = async (moduleId) => {
+  const loadCriteria = useCallback(async (moduleId) => {
+    setLoadingState('criteria', true);
     try {
       const data = await getCriteria(moduleId);
       setCriteria(data);
       return data;
     } catch (error) {
       console.error('Failed to load criteria:', error);
-      throw error;
+    } finally {
+      setLoadingState('criteria', false);
     }
-  };
+  }, [setLoadingState]);
 
-  const loadLessons = async (moduleId) => {
+  const loadLessons = useCallback(async (moduleId) => {
+    setLoadingState('lessons', true);
     try {
       const data = await getLessons(moduleId);
       setLessons(data);
       return data;
     } catch (error) {
       console.error('Failed to load lessons:', error);
-      throw error;
+    } finally {
+      setLoadingState('lessons', false);
     }
-  };
+  }, [setLoadingState]);
 
-  const loadLeaderboard = async (moduleId) => {
+  const loadLeaderboard = useCallback(async (moduleId) => {
+    setLoadingState('leaderboard', true);
     try {
       const data = await getLeaderboard(moduleId);
       setLeaderboard(data);
       return data;
     } catch (error) {
       console.error('Failed to load leaderboard:', error);
-      throw error;
+    } finally {
+      setLoadingState('leaderboard', false);
     }
-  };
+  }, [setLoadingState]);
 
   // Student Management
-  const handleAddStudent = async (e) => {
+  const handleAddStudent = useCallback(async (e) => {
     e.preventDefault();
     if (!studentName.trim()) return;
     
+    setLoadingState('forms', true);
     try {
       await createStudent(id, studentName.trim());
       setStudentName('');
@@ -159,13 +228,16 @@ const GroupDetailPage = () => {
       await loadStudents();
     } catch (error) {
       alert('O\'quvchi qo\'shilmadi. Qaytadan urinib ko\'ring.');
+    } finally {
+      setLoadingState('forms', false);
     }
-  };
+  }, [id, studentName, loadStudents, setLoadingState]);
 
-  const handleUpdateStudent = async (e) => {
+  const handleUpdateStudent = useCallback(async (e) => {
     e.preventDefault();
     if (!studentName.trim() || !editingStudent) return;
     
+    setLoadingState('forms', true);
     try {
       await updateStudent(editingStudent.id, studentName.trim());
       setEditingStudent(null);
@@ -173,10 +245,12 @@ const GroupDetailPage = () => {
       await loadStudents();
     } catch (error) {
       alert('O\'quvchi ma\'lumotlari o\'zgartirilmadi');
+    } finally {
+      setLoadingState('forms', false);
     }
-  };
+  }, [studentName, editingStudent, loadStudents, setLoadingState]);
 
-  const handleDeleteStudent = async (student) => {
+  const handleDeleteStudent = useCallback(async (student) => {
     if (!window.confirm(`"${student.full_name}" ni o'chirmoqchimisiz?`)) return;
     
     try {
@@ -185,34 +259,28 @@ const GroupDetailPage = () => {
     } catch (error) {
       alert('O\'quvchi o\'chirilmadi');
     }
-  };
+  }, [loadStudents]);
 
-  // Criteria Management
-  const handleAddCriteria = async (e) => {
+  // Criteria Management - Updated to use selected module
+  const handleAddCriteria = useCallback(async (e) => {
     e.preventDefault();
-    if (!criteriaForm.name.trim() || !criteriaForm.max_points) return;
-    
-    const activeModule = modules.find(m => m.is_active);
-    if (!activeModule) {
-      alert('Faol modul topilmadi');
-      return;
-    }
+    if (!criteriaForm.name.trim() || !criteriaForm.max_points || !selectedModuleForCriteria) return;
     
     try {
-      await createCriteria(activeModule.id, {
+      await createCriteria(selectedModuleForCriteria.id, {
         name: criteriaForm.name.trim(),
         max_points: parseInt(criteriaForm.max_points),
         grading_method: criteriaForm.grading_method
       });
       setCriteriaForm({ name: '', max_points: '', grading_method: 'one_by_one' });
       setShowAddCriteria(false);
-      await loadCriteria(activeModule.id);
+      await loadCriteria(selectedModuleForCriteria.id);
     } catch (error) {
       alert('Mezon qo\'shilmadi. Maksimal 6 ta mezon qo\'shish mumkin.');
     }
-  };
+  }, [criteriaForm, selectedModuleForCriteria, loadCriteria]);
 
-  const handleUpdateCriteria = async (e) => {
+  const handleUpdateCriteria = useCallback(async (e) => {
     e.preventDefault();
     if (!criteriaForm.name.trim() || !criteriaForm.max_points || !editingCriteria) return;
     
@@ -224,40 +292,38 @@ const GroupDetailPage = () => {
       });
       setEditingCriteria(null);
       setCriteriaForm({ name: '', max_points: '', grading_method: 'one_by_one' });
-      const activeModule = modules.find(m => m.is_active);
-      if (activeModule) {
-        await loadCriteria(activeModule.id);
+      if (selectedModuleForCriteria) {
+        await loadCriteria(selectedModuleForCriteria.id);
       }
     } catch (error) {
       alert('Mezon o\'zgartirilmadi');
     }
-  };
+  }, [criteriaForm, editingCriteria, selectedModuleForCriteria, loadCriteria]);
 
-  const handleDeleteCriteria = async (criteria) => {
+  const handleDeleteCriteria = useCallback(async (criteria) => {
     if (!window.confirm(`"${criteria.name}" mezonini o'chirmoqchimisiz?`)) return;
     
     try {
       await deleteCriteria(criteria.id);
-      const activeModule = modules.find(m => m.is_active);
-      if (activeModule) {
-        await loadCriteria(activeModule.id);
+      if (selectedModuleForCriteria) {
+        await loadCriteria(selectedModuleForCriteria.id);
       }
     } catch (error) {
       alert('Mezon o\'chirilmadi');
     }
-  };
+  }, [selectedModuleForCriteria, loadCriteria]);
 
-  // Module Management
-  const handleCreateModule = async () => {
+  // Module Management - Simplified
+  const handleCreateModule = useCallback(async () => {
     try {
       await createModule(id);
       await loadModules();
     } catch (error) {
       alert('Modul yaratilmadi. Faqat bitta faol modul bo\'lishi mumkin.');
     }
-  };
+  }, [id, loadModules]);
 
-  const handleFinishModule = async (module) => {
+  const handleFinishModule = useCallback(async (module) => {
     if (!window.confirm(`"${module.name}" modulini tugatmoqchimisiz?`)) return;
     
     try {
@@ -266,9 +332,9 @@ const GroupDetailPage = () => {
     } catch (error) {
       alert('Modul tugatirilmadi');
     }
-  };
+  }, [loadModules]);
 
-  const handleDeleteModule = async (module) => {
+  const handleDeleteModule = useCallback(async (module) => {
     if (!window.confirm(`"${module.name}" modulini o'chirmoqchimisiz?`)) return;
     
     try {
@@ -277,17 +343,12 @@ const GroupDetailPage = () => {
     } catch (error) {
       alert('Modul o\'chirilmadi. Faqat oxirgi modulni o\'chirish mumkin.');
     }
-  };
+  }, [loadModules]);
 
   // Lesson Management
-  const handleStartLesson = async () => {
-    const moduleToUse = selectedModuleForLessons || modules.find(m => m.is_active);
-    if (!moduleToUse) {
-      alert('Modul tanlanmadi');
-      return;
-    }
-
-    if (!moduleToUse.is_active) {
+  const handleStartLesson = useCallback(async () => {
+    const moduleToUse = selectedModuleForLessons || activeModule;
+    if (!moduleToUse || !moduleToUse.is_active) {
       alert('Faqat faol modulda dars boshlash mumkin');
       return;
     }
@@ -298,136 +359,62 @@ const GroupDetailPage = () => {
     } catch (error) {
       alert('Dars boshlanmadi. Joriy darsni tugatib, yangi dars boshlang.');
     }
-  };
+  }, [selectedModuleForLessons, activeModule, loadLessons]);
 
-  const handleFinishLesson = async (lesson) => {
+  const handleFinishLesson = useCallback(async (lesson) => {
     if (!window.confirm(`"${lesson.name}" ni tugatmoqchimisiz?`)) return;
     
     try {
       await finishLesson(lesson.id);
-      const moduleToUse = selectedModuleForLessons || modules.find(m => m.is_active);
+      const moduleToUse = selectedModuleForLessons || activeModule;
       if (moduleToUse) {
         await loadLessons(moduleToUse.id);
       }
     } catch (error) {
       alert('Dars tugatirilmadi');
     }
-  };
+  }, [selectedModuleForLessons, activeModule, loadLessons]);
 
-  const handleDeleteLesson = async (lesson) => {
+  const handleDeleteLesson = useCallback(async (lesson) => {
     if (!window.confirm(`"${lesson.name}" ni o'chirmoqchimisiz?`)) return;
     
     try {
       await deleteLesson(lesson.id);
-      const moduleToUse = selectedModuleForLessons || modules.find(m => m.is_active);
+      const moduleToUse = selectedModuleForLessons || activeModule;
       if (moduleToUse) {
         await loadLessons(moduleToUse.id);
       }
     } catch (error) {
       alert('Dars o\'chirilmadi. Faqat oxirgi darsni o\'chirish mumkin.');
     }
-  };
+  }, [selectedModuleForLessons, activeModule, loadLessons]);
 
-  // Grading
-  const startBulkGrading = () => {
-    setGradingMode('bulk');
-    setBulkGrades({});
-  };
-
-  const startIndividualGrading = (student) => {
-    setGradingMode('individual');
-    setSelectedStudent(student);
-  };
-
-  const handleBulkGradeChange = (studentId, criteriaId, value) => {
-    setBulkGrades(prev => ({
-      ...prev,
-      [`${studentId}-${criteriaId}`]: value
-    }));
-  };
-
-  const submitBulkGrades = async () => {
-    const activeModule = modules.find(m => m.is_active);
-    const activeLesson = lessons.find(l => l.is_active);
-    
-    if (!activeModule || !activeLesson) {
-      alert('Faol modul yoki dars topilmadi');
-      return;
+  // Handle module selection for criteria
+  const handleCriteriaModuleChange = useCallback(async (moduleId) => {
+    const module = modules.find(m => m.id === parseInt(moduleId));
+    setSelectedModuleForCriteria(module);
+    if (module) {
+      await loadCriteria(module.id);
     }
-    
-    try {
-      const gradePromises = Object.entries(bulkGrades)
-        .filter(([_, points]) => points && points > 0)
-        .map(([key, points]) => {
-          const [studentId, criteriaId] = key.split('-');
-          return createGrade({
-            student_id: parseInt(studentId),
-            criteria_id: parseInt(criteriaId),
-            lesson_id: activeLesson.id,
-            points_earned: parseInt(points)
-          });
-        });
-      
-      await Promise.all(gradePromises);
-      setGradingMode(null);
-      setBulkGrades({});
-      await loadLeaderboard(activeModule.id);
-    } catch (error) {
-      alert('Baholar saqlanmadi');
-    }
-  };
+  }, [modules, loadCriteria]);
 
-  const submitIndividualGrade = async (criteriaId, points) => {
-    const activeModule = modules.find(m => m.is_active);
-    const activeLesson = lessons.find(l => l.is_active);
-    
-    if (!activeModule || !activeLesson || !selectedStudent) {
-      alert('Faol modul, dars yoki o\'quvchi topilmadi');
-      return;
-    }
-    
-    try {
-      await createGrade({
-        student_id: selectedStudent.student_id,
-        criteria_id: criteriaId,
-        lesson_id: activeLesson.id,
-        points_earned: points
-      });
-      setGradingMode(null);
-      setSelectedStudent(null);
-      await loadLeaderboard(activeModule.id);
-    } catch (error) {
-      alert('Baho saqlanmadi');
-    }
-  };
-
-  const handleManageModule = async (module) => {
-    setActiveTab('lessons');
+  // Handle module selection for lessons
+  const handleLessonsModuleChange = useCallback(async (moduleId) => {
+    const module = modules.find(m => m.id === parseInt(moduleId));
     setSelectedModuleForLessons(module);
-    await loadLessons(module.id);
-    await loadLeaderboard(module.id);
-  };
-
-  const startEdit = (type, item) => {
-    if (type === 'student') {
-      setEditingStudent(item);
-      setStudentName(item.full_name);
-    } else if (type === 'criteria') {
-      setEditingCriteria(item);
-      setCriteriaForm({
-        name: item.name,
-        max_points: item.max_points.toString(),
-        grading_method: item.grading_method
-      });
+    if (module) {
+      await loadLessons(module.id);
     }
-  };
+  }, [modules, loadLessons]);
 
-  const cancelEdit = () => {
-    setEditingStudent(null);
-    setEditingCriteria(null);
-    setStudentName('');
-    setCriteriaForm({ name: '', max_points: '', grading_method: 'one_by_one' });
-  };
+  // Handle module selection for leaderboard
+  const handleLeaderboardModuleChange = useCallback(async (moduleId) => {
+    const module = modules.find(m => m.id === parseInt(moduleId));
+    setSelectedModuleForLeaderboard(module);
+    if (module) {
+      await loadLeaderboard(module.id);
+    }
+  }, [modules, loadLeaderboard]);
 
   if (loading) {
     return (
@@ -440,156 +427,131 @@ const GroupDetailPage = () => {
     );
   }
 
-  const activeModule = modules.find(m => m.is_active);
-
   return (
     <div className="group-detail-page">
-      {/* Header */}
+      {/* Simplified Header */}
       <div className="page-header">
         <div className="header-content">
           <button onClick={() => navigate('/teacher')} className="back-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M19 12H5"/>
-              <path d="M12 19l-7-7 7-7"/>
-            </svg>
-            Orqaga
+            ← Orqaga
           </button>
           
           <div className="group-info">
             <div className="group-icon">{group?.code}</div>
             <div className="group-details">
               <h1>{group?.name}</h1>
-              <div className="group-meta">
-                <span className="group-code">Kod: {group?.code}</span>
-                <span className={`status-badge ${group?.is_active ? 'active' : 'inactive'}`}>
-                  {group?.is_active ? 'Faol' : 'Nofaol'}
-                </span>
-              </div>
+              <span className={`status ${group?.is_active ? 'active' : 'inactive'}`}>
+                {group?.is_active ? 'Faol' : 'Nofaol'}
+              </span>
             </div>
           </div>
 
           <div className="quick-stats">
-            <div className="stat-card">
-              <div className="stat-number">{students.length}</div>
-              <div className="stat-label">O'quvchilar</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-number">{modules.length}</div>
-              <div className="stat-label">Modullar</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-number">{criteria.length}</div>
-              <div className="stat-label">Mezonlar</div>
-            </div>
+            <div className="stat">{students.length} o'quvchi</div>
+            <div className="stat">{modules.length} modul</div>
+            <div className="stat">{criteria.length} mezon</div>
           </div>
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="tab-navigation">
-        <div className="tab-container">
-          {[
-            { id: 'students', label: 'O\'quvchilar', icon: 'users' },
-            { id: 'criteria', label: 'Mezonlar', icon: 'target' },
-            { id: 'modules', label: 'Modullar', icon: 'layers' },
-            { id: 'lessons', label: 'Darslar', icon: 'book' },
-            { id: 'leaderboard', label: 'Reyting', icon: 'trophy' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-            >
-              <TabIcon type={tab.icon} />
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      {/* Simplified Navigation */}
+      <div className="tab-nav">
+        {[
+          { id: 'students', label: 'O\'quvchilar' },
+          { id: 'criteria', label: 'Mezonlar' },
+          { id: 'modules', label: 'Modullar' },
+          { id: 'lessons', label: 'Darslar' },
+          { id: 'leaderboard', label: 'Reyting' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`tab ${activeTab === tab.id ? 'active' : ''}`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Tab Content */}
       <div className="tab-content">
         {/* Students Tab */}
         {activeTab === 'students' && (
-          <div className="students-section">
+          <div className={`section ${loadingStates.students ? 'section-loading' : ''}`}>
             <div className="section-header">
               <h2>O'quvchilar ({students.length}/30)</h2>
               <button 
                 onClick={() => setShowAddStudent(true)}
-                className="add-btn"
-                disabled={students.length >= 30}
+                className="btn-add"
+                disabled={students.length >= 30 || loadingStates.forms}
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="12" y1="8" x2="12" y2="16"/>
-                  <line x1="8" y1="12" x2="16" y2="12"/>
-                </svg>
-                O'quvchi qo'shish
+                {loadingStates.forms ? (
+                  <div className="inline-loading">
+                    <div className="small-spinner"></div>
+                    Yuklanmoqda...
+                  </div>
+                ) : (
+                  '+ O\'quvchi qo\'shish'
+                )}
               </button>
             </div>
 
             {showAddStudent && (
               <div className="form-card">
-                <div className="form-header">
-                  <h3>Yangi o'quvchi qo'shish</h3>
-                  <button onClick={() => setShowAddStudent(false)} className="close-btn">×</button>
-                </div>
-                <form onSubmit={handleAddStudent} className="add-form">
+                <h3>Yangi o'quvchi</h3>
+                <form onSubmit={handleAddStudent} className="simple-form">
                   <input
                     type="text"
                     placeholder="O'quvchi ismi"
                     value={studentName}
                     onChange={(e) => setStudentName(e.target.value)}
-                    className="form-input"
                     required
                   />
                   <div className="form-actions">
-                    <button type="submit" className="submit-btn">Qo'shish</button>
-                    <button type="button" onClick={() => setShowAddStudent(false)} className="cancel-btn">Bekor qilish</button>
+                    <button type="submit" disabled={loadingStates.forms}>
+                      {loadingStates.forms ? (
+                        <div className="inline-loading">
+                          <div className="small-spinner"></div>
+                          Qo'shilmoqda...
+                        </div>
+                      ) : (
+                        'Qo\'shish'
+                      )}
+                    </button>
+                    <button type="button" onClick={() => setShowAddStudent(false)} disabled={loadingStates.forms}>Bekor</button>
                   </div>
                 </form>
               </div>
             )}
 
-            <div className="students-grid">
+            <div className="items-grid">
               {students.map(student => (
-                <div key={student.id} className="student-card">
+                <div key={student.id} className="item-card">
                   {editingStudent?.id === student.id ? (
                     <form onSubmit={handleUpdateStudent} className="edit-form">
                       <input
                         type="text"
                         value={studentName}
                         onChange={(e) => setStudentName(e.target.value)}
-                        className="form-input"
                         required
                       />
                       <div className="form-actions">
-                        <button type="submit" className="save-btn">Saqlash</button>
-                        <button type="button" onClick={cancelEdit} className="cancel-btn">Bekor qilish</button>
+                        <button type="submit">Saqlash</button>
+                        <button type="button" onClick={() => setEditingStudent(null)}>Bekor</button>
                       </div>
                     </form>
                   ) : (
                     <>
-                      <div className="student-info">
-                        <div className="student-avatar">{student.full_name.charAt(0)}</div>
-                        <div className="student-details">
-                          <h4>{student.full_name}</h4>
-                          <p>Qo'shilgan: {new Date(student.added_at).toLocaleDateString()}</p>
-                        </div>
+                      <div className="item-info">
+                        <h4>{student.full_name}</h4>
+                        <p>{new Date(student.added_at).toLocaleDateString()}</p>
                       </div>
-                      <div className="student-actions">
-                        <button onClick={() => startEdit('student', student)} className="edit-btn">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                          </svg>
-                        </button>
-                        <button onClick={() => handleDeleteStudent(student)} className="delete-btn">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <polyline points="3,6 5,6 21,6"/>
-                            <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
-                          </svg>
-                        </button>
+                      <div className="item-actions">
+                        <button onClick={() => {
+                          setEditingStudent(student);
+                          setStudentName(student.full_name);
+                        }}>✏️</button>
+                        <button onClick={() => handleDeleteStudent(student)}>🗑️</button>
                       </div>
                     </>
                   )}
@@ -599,329 +561,211 @@ const GroupDetailPage = () => {
           </div>
         )}
 
-        {/* Criteria Tab */}
+        {/* Criteria Tab - Now with Module Selector */}
         {activeTab === 'criteria' && (
-          <div className="criteria-section">
+          <div className={`section ${loadingStates.criteria ? 'section-loading' : ''}`}>
             <div className="section-header">
-              <h2>Baholash mezonlari ({criteria.length}/6)</h2>
+              <div>
+                <h2>Baholash mezonlari ({criteria.length}/6)</h2>
+                <div className="module-selector">
+                  <label>Modul:</label>
+                  <select 
+                    value={selectedModuleForCriteria?.id || ''} 
+                    onChange={(e) => handleCriteriaModuleChange(e.target.value)}
+                    disabled={loadingStates.criteria}
+                  >
+                    <option value="">Modulni tanlang</option>
+                    {modules.map(module => (
+                      <option key={module.id} value={module.id}>
+                        {module.name} {module.is_active ? '(Faol)' : module.is_finished ? '(Tugatilgan)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <button 
                 onClick={() => setShowAddCriteria(true)}
-                className="add-btn"
-                disabled={criteria.length >= 6 || !activeModule}
+                className="btn-add"
+                disabled={criteria.length >= 6 || !selectedModuleForCriteria || loadingStates.forms}
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="12" y1="8" x2="12" y2="16"/>
-                  <line x1="8" y1="12" x2="16" y2="12"/>
-                </svg>
-                Mezon qo'shish
+                {loadingStates.forms ? (
+                  <div className="inline-loading">
+                    <div className="small-spinner"></div>
+                    Yuklanmoqda...
+                  </div>
+                ) : (
+                  '+ Mezon qo\'shish'
+                )}
               </button>
             </div>
 
-            {showAddCriteria && (
-              <div className="form-card">
-                <div className="form-header">
-                  <h3>Yangi mezon qo'shish</h3>
-                  <button onClick={() => setShowAddCriteria(false)} className="close-btn">×</button>
-                </div>
-                <form onSubmit={handleAddCriteria} className="add-form">
-                  <input
-                    type="text"
-                    placeholder="Mezon nomi"
-                    value={criteriaForm.name}
-                    onChange={(e) => setCriteriaForm({...criteriaForm, name: e.target.value})}
-                    className="form-input"
-                    required
-                  />
-                  <input
-                    type="number"
-                    placeholder="Maksimal ball"
-                    value={criteriaForm.max_points}
-                    onChange={(e) => setCriteriaForm({...criteriaForm, max_points: e.target.value})}
-                    className="form-input"
-                    min="1"
-                    required
-                  />
-                  <select
-                    value={criteriaForm.grading_method}
-                    onChange={(e) => setCriteriaForm({...criteriaForm, grading_method: e.target.value})}
-                    className="form-select"
-                  >
-                    <option value="one_by_one">Birma-bir</option>
-                    <option value="bulk">Ommaviy</option>
-                  </select>
-                  <div className="form-actions">
-                    <button type="submit" className="submit-btn">Qo'shish</button>
-                    <button type="button" onClick={() => setShowAddCriteria(false)} className="cancel-btn">Bekor qilish</button>
-                  </div>
-                </form>
+            {!selectedModuleForCriteria ? (
+              <div className="empty-state">
+                <h4>Modulni tanlang</h4>
+                <p>Mezonlarni ko'rish uchun yuqoridan modulni tanlang</p>
               </div>
-            )}
-
-            <div className="criteria-grid">
-              {criteria.map(criterion => (
-                <div key={criterion.id} className="criteria-card">
-                  {editingCriteria?.id === criterion.id ? (
-                    <form onSubmit={handleUpdateCriteria} className="edit-form">
+            ) : (
+              <>
+                {showAddCriteria && (
+                  <div className="form-card">
+                    <h3>Yangi mezon</h3>
+                    <form onSubmit={handleAddCriteria} className="simple-form">
                       <input
                         type="text"
+                        placeholder="Mezon nomi"
                         value={criteriaForm.name}
                         onChange={(e) => setCriteriaForm({...criteriaForm, name: e.target.value})}
-                        className="form-input"
                         required
                       />
                       <input
                         type="number"
+                        placeholder="Maksimal ball"
                         value={criteriaForm.max_points}
                         onChange={(e) => setCriteriaForm({...criteriaForm, max_points: e.target.value})}
-                        className="form-input"
                         min="1"
                         required
                       />
                       <select
                         value={criteriaForm.grading_method}
                         onChange={(e) => setCriteriaForm({...criteriaForm, grading_method: e.target.value})}
-                        className="form-select"
                       >
                         <option value="one_by_one">Birma-bir</option>
                         <option value="bulk">Ommaviy</option>
                       </select>
                       <div className="form-actions">
-                        <button type="submit" className="save-btn">Saqlash</button>
-                        <button type="button" onClick={cancelEdit} className="cancel-btn">Bekor qilish</button>
+                        <button type="submit">Qo'shish</button>
+                        <button type="button" onClick={() => setShowAddCriteria(false)}>Bekor</button>
                       </div>
                     </form>
-                  ) : (
-                    <>
-                      <div className="criteria-info">
-                        <h4>{criterion.name}</h4>
-                        <div className="criteria-details">
-                          <span className="max-points">{criterion.max_points} ball</span>
-                          <span className={`method-badge ${criterion.grading_method}`}>
-                            {criterion.grading_method === 'one_by_one' ? 'Birma-bir' : 'Ommaviy'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="criteria-actions">
-                        <button onClick={() => startEdit('criteria', criterion)} className="edit-btn">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                          </svg>
-                        </button>
-                        <button onClick={() => handleDeleteCriteria(criterion)} className="delete-btn">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <polyline points="3,6 5,6 21,6"/>
-                            <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
-                          </svg>
-                        </button>
-                      </div>
-                    </>
-                  )}
+                  </div>
+                )}
+
+                <div className="items-grid">
+                  {criteria.map(criterion => (
+                    <div key={criterion.id} className="item-card">
+                      {editingCriteria?.id === criterion.id ? (
+                        <form onSubmit={handleUpdateCriteria} className="edit-form">
+                          <input
+                            type="text"
+                            value={criteriaForm.name}
+                            onChange={(e) => setCriteriaForm({...criteriaForm, name: e.target.value})}
+                            required
+                          />
+                          <input
+                            type="number"
+                            value={criteriaForm.max_points}
+                            onChange={(e) => setCriteriaForm({...criteriaForm, max_points: e.target.value})}
+                            min="1"
+                            required
+                          />
+                          <select
+                            value={criteriaForm.grading_method}
+                            onChange={(e) => setCriteriaForm({...criteriaForm, grading_method: e.target.value})}
+                          >
+                            <option value="one_by_one">Birma-bir</option>
+                            <option value="bulk">Ommaviy</option>
+                          </select>
+                          <div className="form-actions">
+                            <button type="submit">Saqlash</button>
+                            <button type="button" onClick={() => setEditingCriteria(null)}>Bekor</button>
+                          </div>
+                        </form>
+                      ) : (
+                        <>
+                          <div className="item-info">
+                            <h4>{criterion.name}</h4>
+                            <p>{criterion.max_points} ball - {criterion.grading_method === 'one_by_one' ? 'Birma-bir' : 'Ommaviy'}</p>
+                          </div>
+                          <div className="item-actions">
+                            <button onClick={() => {
+                              setEditingCriteria(criterion);
+                              setCriteriaForm({
+                                name: criterion.name,
+                                max_points: criterion.max_points.toString(),
+                                grading_method: criterion.grading_method
+                              });
+                            }}>✏️</button>
+                            <button onClick={() => handleDeleteCriteria(criterion)}>🗑️</button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Simplified Modules Tab */}
+        {activeTab === 'modules' && (
+          <div className={`section ${loadingStates.modules ? 'section-loading' : ''}`}>
+            <div className="section-header">
+              <h2>Modullar</h2>
+              <button 
+                onClick={handleCreateModule}
+                className="btn-add"
+                disabled={!!activeModule || loadingStates.forms}
+              >
+                {loadingStates.forms ? (
+                  <div className="inline-loading">
+                    <div className="small-spinner"></div>
+                    Yaratilmoqda...
+                  </div>
+                ) : (
+                  '+ Yangi modul'
+                )}
+              </button>
+            </div>
+
+            <div className="modules-simple">
+              {modules.map((module, index) => (
+                <div key={module.id} className={`module-card-simple ${module.is_active ? 'active' : module.is_finished ? 'finished' : ''}`}>
+                  <div className="module-info">
+                    <div className="module-number">{index + 1}</div>
+                    <div>
+                      <h4>{module.name}</h4>
+                      <span className={`status ${module.is_active ? 'active' : module.is_finished ? 'finished' : 'inactive'}`}>
+                        {module.is_active ? 'Faol' : module.is_finished ? 'Tugatilgan' : 'Kutilmoqda'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="module-actions">
+                    <button onClick={() => {
+                      setActiveTab('lessons');
+                      setSelectedModuleForLessons(module);
+                      loadLessons(module.id);
+                    }}>Boshqarish</button>
+                    {module.is_active && (
+                      <button onClick={() => handleFinishModule(module)}>Tugatish</button>
+                    )}
+                    {!module.is_finished && (
+                      <button onClick={() => handleDeleteModule(module)}>O'chirish</button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Modules Tab */}
-        {activeTab === 'modules' && (
-          <div className="modules-section">
-            <div className="section-header">
-              <h2>Modullar</h2>
-              <button 
-                onClick={handleCreateModule}
-                className="add-btn"
-                disabled={!!activeModule}
-                title={!!activeModule ? 'Faqat bitta faol modul bo\'lishi mumkin' : ''}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="12" y1="8" x2="12" y2="16"/>
-                  <line x1="8" y1="12" x2="16" y2="12"/>
-                </svg>
-                Yangi modul
-              </button>
-            </div>
-
-            {modules.length === 0 ? (
-              <div className="empty-modules">
-                <div className="empty-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <polygon points="12,2 2,7 12,12 22,7 12,2"/>
-                    <polyline points="2,17 12,22 22,17"/>
-                    <polyline points="2,12 12,17 22,12"/>
-                  </svg>
-                </div>
-                <h3>Hali modullar yo'q</h3>
-                <p>Birinchi modulni yaratib, darslarni boshlang</p>
-                <button 
-                  onClick={handleCreateModule}
-                  className="create-first-module-btn"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="12" y1="8" x2="12" y2="16"/>
-                    <line x1="8" y1="12" x2="16" y2="12"/>
-                  </svg>
-                  Birinchi modulni yaratish
-                </button>
-              </div>
-            ) : (
-              <div className="modules-timeline">
-                {modules.map((module, index) => (
-                  <div key={module.id} className={`module-timeline-item ${module.is_active ? 'active' : module.is_finished ? 'finished' : 'upcoming'}`}>
-                    {/* Timeline connector */}
-                    {index < modules.length - 1 && (
-                      <div className="timeline-connector"></div>
-                    )}
-                    
-                    {/* Module card */}
-                    <div className="beautiful-module-card">
-                      {/* Card header with status indicator */}
-                      <div className="module-card-header">
-                        <div className="module-number">
-                          <span>{index + 1}</span>
-                        </div>
-                        <div className="module-info">
-                          <h3>{module.name}</h3>
-                          <p className="module-created">
-                            Yaratilgan: {new Date(module.created_at).toLocaleDateString('uz-UZ')}
-                          </p>
-                        </div>
-                        <div className={`module-status-indicator ${module.is_active ? 'active' : module.is_finished ? 'finished' : 'inactive'}`}>
-                          {module.is_active ? (
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                              <circle cx="12" cy="12" r="10"/>
-                              <path d="M9,12l2,2 4,-4"/>
-                            </svg>
-                          ) : module.is_finished ? (
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                              <polyline points="22,4 12,14.01 9,11.01"/>
-                            </svg>
-                          ) : (
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                              <circle cx="12" cy="12" r="10"/>
-                              <polyline points="8,12 12,16 16,12"/>
-                            </svg>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Status badge */}
-                      <div className="module-status-section">
-                        <span className={`beautiful-status-badge ${module.is_active ? 'active' : module.is_finished ? 'finished' : 'inactive'}`}>
-                          {module.is_active ? (
-                            <>
-                              <span className="status-dot"></span>
-                              Faol modul
-                            </>
-                          ) : module.is_finished ? (
-                            <>
-                              <svg viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                              </svg>
-                              Tugatilgan
-                            </>
-                          ) : (
-                            <>
-                              <span className="status-dot"></span>
-                              Kutilmoqda
-                            </>
-                          )}
-                        </span>
-                      </div>
-
-                      {/* Module stats */}
-                      <div className="module-stats">
-                        <div className="stat-item">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                          </svg>
-                          <span>{lessons.filter(l => l.module_id === module.id).length} dars</span>
-                        </div>
-                        <div className="stat-item">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <circle cx="12" cy="12" r="10"/>
-                            <circle cx="12" cy="12" r="6"/>
-                            <circle cx="12" cy="12" r="2"/>
-                          </svg>
-                          <span>{criteria.filter(c => c.module_id === module.id).length} mezon</span>
-                        </div>
-                      </div>
-
-                      {/* Action buttons */}
-                      <div className="module-actions-beautiful">
-                        <button 
-                          onClick={() => handleManageModule(module)}
-                          className="action-btn primary"
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                            <path d="M2 17l10 5 10-5"/>
-                            <path d="M2 12l10 5 10-5"/>
-                          </svg>
-                          Boshqarish
-                        </button>
-                        
-                        {module.is_active && (
-                          <button 
-                            onClick={() => handleFinishModule(module)} 
-                            className="action-btn warning"
-                          >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                              <polyline points="20,6 9,17 4,12"/>
-                            </svg>
-                            Tugatish
-                          </button>
-                        )}
-                        
-                        {!module.is_finished && (
-                          <button 
-                            onClick={() => handleDeleteModule(module)} 
-                            className="action-btn danger"
-                          >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                              <polyline points="3,6 5,6 21,6"/>
-                              <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                            </svg>
-                            O'chirish
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Lessons Tab */}
+        {/* Simplified Lessons Tab */}
         {activeTab === 'lessons' && (
-          <div className="lessons-section">
+          <div className={`section ${loadingStates.lessons ? 'section-loading' : ''}`}>
             <div className="section-header">
-              <div className="lessons-header-left">
+              <div>
                 <h2>Darslar</h2>
-                <div className="module-selector-lessons">
+                <div className="module-selector">
                   <label>Modul:</label>
                   <select 
                     value={selectedModuleForLessons?.id || ''} 
-                    onChange={(e) => {
-                      const module = modules.find(m => m.id === parseInt(e.target.value));
-                      setSelectedModuleForLessons(module);
-                      if (module) {
-                        loadLessons(module.id);
-                      }
-                    }}
-                    className="module-dropdown-lessons"
+                    onChange={(e) => handleLessonsModuleChange(e.target.value)}
+                    disabled={loadingStates.lessons}
                   >
                     <option value="">Modulni tanlang</option>
                     {modules.map(module => (
                       <option key={module.id} value={module.id}>
-                        {module.name} {module.is_active ? '(Faol)' : module.is_finished ? '(Tugatilgan)' : '(Nofaol)'}
+                        {module.name} {module.is_active ? '(Faol)' : module.is_finished ? '(Tugatilgan)' : ''}
                       </option>
                     ))}
                   </select>
@@ -929,80 +773,46 @@ const GroupDetailPage = () => {
               </div>
               <button 
                 onClick={handleStartLesson} 
-                className="add-btn"
-                disabled={!selectedModuleForLessons?.is_active || lessons.some(l => l.is_active)}
-                title={!selectedModuleForLessons ? 'Avval modulni tanlang' : 
-                       !selectedModuleForLessons.is_active ? 'Faqat faol modulda dars boshlash mumkin' : 
-                       lessons.some(l => l.is_active) ? 'Joriy darsni tugatib, yangi dars boshlang' : ''}
+                className="btn-add"
+                disabled={!selectedModuleForLessons?.is_active || !!activeLesson || loadingStates.forms}
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="12" y1="8" x2="12" y2="16"/>
-                  <line x1="8" y1="12" x2="16" y2="12"/>
-                </svg>
-                Dars boshlash
+                {loadingStates.forms ? (
+                  <div className="inline-loading">
+                    <div className="small-spinner"></div>
+                    Boshlanmoqda...
+                  </div>
+                ) : (
+                  '+ Dars boshlash'
+                )}
               </button>
             </div>
 
             {!selectedModuleForLessons ? (
-              <div className="no-module-selected-lessons">
-                <div className="select-module-prompt">
-                  <div className="prompt-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                    </svg>
-                  </div>
-                  <h4>Modulni tanlang</h4>
-                  <p>Darslarni ko'rish uchun yuqoridagi ro'yxatdan modulni tanlang</p>
-                </div>
+              <div className="empty-state">
+                <h4>Modulni tanlang</h4>
+                <p>Darslarni ko'rish uchun yuqoridan modulni tanlang</p>
               </div>
             ) : lessons.length === 0 ? (
-              <div className="empty-lessons">
-                <div className="empty-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                  </svg>
-                </div>
+              <div className="empty-state">
                 <h4>Hali darslar yo'q</h4>
                 <p>{selectedModuleForLessons.name} uchun hali darslar boshlanmagan</p>
-                {selectedModuleForLessons.is_active && (
-                  <button 
-                    onClick={handleStartLesson}
-                    className="start-first-lesson-btn"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <circle cx="12" cy="12" r="10"/>
-                      <line x1="12" y1="8" x2="12" y2="16"/>
-                      <line x1="8" y1="12" x2="16" y2="12"/>
-                    </svg>
-                    Birinchi darsni boshlash
-                  </button>
-                )}
               </div>
             ) : (
-              <div className="lessons-list">
+              <div className="lessons-simple">
                 {lessons.map(lesson => (
-                  <div key={lesson.id} className={`lesson-card ${lesson.is_active ? 'active' : ''}`}>
+                  <div key={lesson.id} className={`lesson-card-simple ${lesson.is_active ? 'active' : ''}`}>
                     <div className="lesson-info">
                       <h4>{lesson.name}</h4>
-                      <span className={`status-badge ${lesson.is_active ? 'active' : 'finished'}`}>
+                      <span className={`status ${lesson.is_active ? 'active' : 'finished'}`}>
                         {lesson.is_active ? 'Faol' : 'Tugatilgan'}
                       </span>
                     </div>
-                    <div className="lesson-actions">
-                      {lesson.is_active && (
-                        <>
-                          <button onClick={() => handleFinishLesson(lesson)} className="finish-btn">
-                            Darsni tugatish
-                          </button>
-                          <button onClick={() => handleDeleteLesson(lesson)} className="delete-btn">
-                            O'chirish
-                          </button>
-                        </>
-                      )}
-                    </div>
+                    {lesson.is_active && (
+                      <div className="lesson-actions">
+                        <button onClick={() => handleFinishLesson(lesson)}>Tugatish</button>
+                        <button onClick={() => handleDeleteLesson(lesson)}>O'chirish</button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1010,158 +820,55 @@ const GroupDetailPage = () => {
           </div>
         )}
 
-        {/* Leaderboard Tab */}
+        {/* Simplified Leaderboard Tab */}
         {activeTab === 'leaderboard' && (
-          <div className="leaderboard-section">
+          <div className={`section ${loadingStates.leaderboard ? 'section-loading' : ''}`}>
             <div className="section-header">
-              <h2>Reyting jadvali</h2>
-              <div className="grading-controls">
-                <button 
-                  onClick={startBulkGrading} 
-                  className="grade-btn bulk"
-                  disabled={!activeModule || !lessons.find(l => l.is_active) || criteria.length === 0}
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M9 12l2 2 4-4"/>
-                    <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"/>
-                    <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3"/>
-                  </svg>
-                  Ommaviy baholash
-                </button>
-              </div>
-            </div>
-
-            {gradingMode === 'bulk' && (
-              <div className="bulk-grading-panel">
-                <h3>Ommaviy baholash</h3>
-                <div className="grading-table">
-                  <div className="table-header">
-                    <div>O'quvchi</div>
-                    {criteria.map(criterion => (
-                      <div key={criterion.id}>{criterion.name}</div>
-                    ))}
-                  </div>
-                  {students.map(student => (
-                    <div key={student.id} className="table-row">
-                      <div className="student-name">{student.full_name}</div>
-                      {criteria.map(criterion => (
-                        <div key={criterion.id}>
-                          <input
-                            type="number"
-                            min="0"
-                            max={criterion.max_points}
-                            placeholder="0"
-                            onChange={(e) => handleBulkGradeChange(student.id, criterion.id, e.target.value)}
-                            className="grade-input"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-                <div className="bulk-actions">
-                  <button onClick={submitBulkGrades} className="submit-btn">Baholarni saqlash</button>
-                  <button onClick={() => setGradingMode(null)} className="cancel-btn">Bekor qilish</button>
-                </div>
-              </div>
-            )}
-
-            {gradingMode === 'individual' && selectedStudent && (
-              <div className="individual-grading-panel">
-                <h3>{selectedStudent.name} - Birma-bir baholash</h3>
-                <div className="criteria-list">
-                  {criteria.map(criterion => (
-                    <div key={criterion.id} className="criteria-grading">
-                      <h4>{criterion.name} (Maksimal: {criterion.max_points})</h4>
-                      <div className="points-selector">
-                        {Array.from({length: criterion.max_points + 1}, (_, i) => (
-                          <button
-                            key={i}
-                            onClick={() => submitIndividualGrade(criterion.id, i)}
-                            className="point-btn"
-                          >
-                            {i}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <button onClick={() => setGradingMode(null)} className="cancel-btn">Bekor qilish</button>
-              </div>
-            )}
-
-            <div className="leaderboard-table">
-              {leaderboard.map(student => (
-                <div key={student.student_id} className="leaderboard-row">
-                  <div className="rank">#{student.position}</div>
-                  <div className="student-info">
-                    <div className="student-avatar">{student.name.charAt(0)}</div>
-                    <div className="student-name">{student.name}</div>
-                  </div>
-                  <div className="points">{student.total_points} ball</div>
-                  <button 
-                    onClick={() => startIndividualGrading(student)}
-                    className="grade-individual-btn"
-                    disabled={!activeModule || !lessons.find(l => l.is_active) || criteria.length === 0}
+              <div>
+                <h2>Reyting jadvali</h2>
+                <div className="module-selector">
+                  <label>Modul:</label>
+                  <select 
+                    value={selectedModuleForLeaderboard?.id || ''} 
+                    onChange={(e) => handleLeaderboardModuleChange(e.target.value)}
+                    disabled={loadingStates.leaderboard}
                   >
-                    Baholash
-                  </button>
+                    <option value="">Modulni tanlang</option>
+                    {modules.map(module => (
+                      <option key={module.id} value={module.id}>
+                        {module.name} {module.is_active ? '(Faol)' : module.is_finished ? '(Tugatilgan)' : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              ))}
+              </div>
             </div>
+
+            {!selectedModuleForLeaderboard ? (
+              <div className="empty-state">
+                <h4>Modulni tanlang</h4>
+                <p>Reyting jadvalini ko'rish uchun yuqoridan modulni tanlang</p>
+              </div>
+            ) : leaderboard.length === 0 ? (
+              <div className="empty-state">
+                <h4>Hali natijalar yo'q</h4>
+                <p>{selectedModuleForLeaderboard.name} uchun hali baholar kiritilmagan</p>
+              </div>
+            ) : (
+              <div className="leaderboard-simple">
+                {leaderboard.map(student => (
+                  <div key={student.student_id} className="leaderboard-item-simple">
+                    <div className="rank">#{student.position}</div>
+                    <div className="student-name">{student.name}</div>
+                    <div className="points">{student.total_points} ball</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
     </div>
-  );
-};
-
-// Helper component for tab icons
-const TabIcon = ({ type }) => {
-  const iconPaths = {
-    users: (
-      <>
-        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-        <circle cx="9" cy="7" r="4"/>
-        <path d="M23 21v-2a4 4 0 00-3-3.87"/>
-        <path d="M16 3.13a4 4 0 010 7.75"/>
-      </>
-    ),
-    target: (
-      <>
-        <circle cx="12" cy="12" r="10"/>
-        <circle cx="12" cy="12" r="6"/>
-        <circle cx="12" cy="12" r="2"/>
-      </>
-    ),
-    layers: (
-      <>
-        <polygon points="12,2 2,7 12,12 22,7 12,2"/>
-        <polyline points="2,17 12,22 22,17"/>
-        <polyline points="2,12 12,17 22,12"/>
-      </>
-    ),
-    book: (
-      <>
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-      </>
-    ),
-    trophy: (
-      <>
-        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/>
-        <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>
-        <path d="M4 22h16"/>
-        <path d="M10 14.66V17c0 .55.47.98.97 1.21C12.04 18.75 14 20 14 20s1.96-1.25 3.03-1.79c.5-.23.97-.66.97-1.21v-2.34c0-1.17-.53-2.26-1.44-2.99L14 10l-2.56 1.67c-.91.73-1.44 1.82-1.44 2.99z"/>
-      </>
-    )
-  };
-  
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-      {iconPaths[type]}
-    </svg>
   );
 };
 
