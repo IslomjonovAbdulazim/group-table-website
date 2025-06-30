@@ -6,7 +6,10 @@ import LoginPage from './pages/LoginPage';
 import AdminPage from './pages/AdminPage';
 import TeacherPage from './pages/TeacherPage';
 import GroupPage from './pages/GroupPage';
+// Add this import
+import GroupDetailPage from './pages/GroupDetailPage';
 
+// Add this route inside <Routes>
 function App() {
   return (
     <Router>
@@ -17,6 +20,7 @@ function App() {
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/teacher" element={<TeacherPage />} />
           <Route path="/group/:code" element={<GroupPage />} />
+          <Route path="/teacher/group/:id" element={<GroupDetailPage />} />
         </Routes>
       </div>
     </Router>
