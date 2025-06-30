@@ -14,12 +14,16 @@ const TeacherPage = () => {
   const [editName, setEditName] = useState('');
   const [updating, setUpdating] = useState(false);
 
-  const userType = getUserType();
   const navigate = useNavigate();
 
   useEffect(() => {
+    const userType = getUserType();
+    if (userType !== 'teacher') {
+      navigate('/login');
+      return;
+    }
     loadGroups();
-  }, []);
+  }, [navigate]);
 
   const loadGroups = async () => {
     try {

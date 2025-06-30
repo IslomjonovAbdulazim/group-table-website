@@ -30,6 +30,7 @@ const GroupDetailPage = () => {
   const [editingCriteria, setEditingCriteria] = useState(null);
   const [gradingMode, setGradingMode] = useState(null); // 'bulk' or 'individual'
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [selectedModuleForLessons, setSelectedModuleForLessons] = useState(null);
   const [bulkGrades, setBulkGrades] = useState({});
 
   // Form inputs
@@ -62,11 +63,16 @@ const GroupDetailPage = () => {
       // If there's an active module, load its criteria and lessons
       const activeModule = modulesData?.find(m => m.is_active);
       if (activeModule) {
+        setSelectedModuleForLessons(activeModule);
         await Promise.all([
           loadCriteria(activeModule.id),
           loadLessons(activeModule.id),
           loadLeaderboard(activeModule.id)
         ]);
+      } else if (modulesData?.length > 0) {
+        // If no active module, select the first one for lessons view
+        setSelectedModuleForLessons(modulesData[0]);
+        await loadLessons(modulesData[0].id);
       }
     } catch (error) {
       console.error('Failed to load group data:', error);
@@ -275,15 +281,20 @@ const GroupDetailPage = () => {
 
   // Lesson Management
   const handleStartLesson = async () => {
-    const activeModule = modules.find(m => m.is_active);
-    if (!activeModule) {
-      alert('Faol modul topilmadi');
+    const moduleToUse = selectedModuleForLessons || modules.find(m => m.is_active);
+    if (!moduleToUse) {
+      alert('Modul tanlanmadi');
+      return;
+    }
+
+    if (!moduleToUse.is_active) {
+      alert('Faqat faol modulda dars boshlash mumkin');
       return;
     }
     
     try {
-      await startLesson(activeModule.id);
-      await loadLessons(activeModule.id);
+      await startLesson(moduleToUse.id);
+      await loadLessons(moduleToUse.id);
     } catch (error) {
       alert('Dars boshlanmadi. Joriy darsni tugatib, yangi dars boshlang.');
     }
@@ -294,9 +305,9 @@ const GroupDetailPage = () => {
     
     try {
       await finishLesson(lesson.id);
-      const activeModule = modules.find(m => m.is_active);
-      if (activeModule) {
-        await loadLessons(activeModule.id);
+      const moduleToUse = selectedModuleForLessons || modules.find(m => m.is_active);
+      if (moduleToUse) {
+        await loadLessons(moduleToUse.id);
       }
     } catch (error) {
       alert('Dars tugatirilmadi');
@@ -308,9 +319,9 @@ const GroupDetailPage = () => {
     
     try {
       await deleteLesson(lesson.id);
-      const activeModule = modules.find(m => m.is_active);
-      if (activeModule) {
-        await loadLessons(activeModule.id);
+      const moduleToUse = selectedModuleForLessons || modules.find(m => m.is_active);
+      if (moduleToUse) {
+        await loadLessons(moduleToUse.id);
       }
     } catch (error) {
       alert('Dars o\'chirilmadi. Faqat oxirgi darsni o\'chirish mumkin.');
@@ -392,30 +403,12 @@ const GroupDetailPage = () => {
 
   const handleManageModule = async (module) => {
     setActiveTab('lessons');
+    setSelectedModuleForLessons(module);
     await loadLessons(module.id);
     await loadLeaderboard(module.id);
   };
 
   const startEdit = (type, item) => {
-    if (type === 'student') {
-      setEditingStudent(item);
-      setStudentName(item.full_name);
-    } else if (type === 'criteria') {
-      setEditingCriteria(item);
-      setCriteriaForm({
-        name: item.name,
-        max_points: item.max_points.toString(),
-        grading_method: item.grading_method
-      });
-    }
-  };
-
-  const cancelEdit = () => {
-    setEditingStudent(null);
-    setEditingCriteria(null);
-    setStudentName('');
-    setCriteriaForm({ name: '', max_points: '', grading_method: 'one_by_one' });
-  };
     if (type === 'student') {
       setEditingStudent(item);
       setStudentName(item.full_name);
@@ -614,7 +607,7 @@ const GroupDetailPage = () => {
               <button 
                 onClick={() => setShowAddCriteria(true)}
                 className="add-btn"
-                disabled={criteria.length >= 6}
+                disabled={criteria.length >= 6 || !activeModule}
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <circle cx="12" cy="12" r="10"/>
@@ -740,6 +733,7 @@ const GroupDetailPage = () => {
                 onClick={handleCreateModule}
                 className="add-btn"
                 disabled={!!activeModule}
+                title={!!activeModule ? 'Faqat bitta faol modul bo\'lishi mumkin' : ''}
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <circle cx="12" cy="12" r="10"/>
@@ -750,31 +744,158 @@ const GroupDetailPage = () => {
               </button>
             </div>
 
-            <div className="modules-grid">
-              {modules.map(module => (
-                <div key={module.id} className={`module-card ${module.is_active ? 'active' : ''}`}>
-                  <div className="module-header">
-                    <h4>{module.name}</h4>
-                    <span className={`status-badge ${module.is_active ? 'active' : module.is_finished ? 'finished' : 'inactive'}`}>
-                      {module.is_active ? 'Faol' : module.is_finished ? 'Tugatilgan' : 'Nofaol'}
-                    </span>
-                  </div>
-                  <div className="module-actions">
-                    <button 
-                      onClick={() => handleManageModule(module)}
-                      className="manage-btn"
-                    >
-                      Darslarni boshqarish
-                    </button>
-                    {module.is_active && (
-                      <button onClick={() => handleFinishModule(module)} className="finish-btn">
-                        Modulni tugatish
-                      </button>
-                    )}
-                  </div>
+            {modules.length === 0 ? (
+              <div className="empty-modules">
+                <div className="empty-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <polygon points="12,2 2,7 12,12 22,7 12,2"/>
+                    <polyline points="2,17 12,22 22,17"/>
+                    <polyline points="2,12 12,17 22,12"/>
+                  </svg>
                 </div>
-              ))}
-            </div>
+                <h3>Hali modullar yo'q</h3>
+                <p>Birinchi modulni yaratib, darslarni boshlang</p>
+                <button 
+                  onClick={handleCreateModule}
+                  className="create-first-module-btn"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="16"/>
+                    <line x1="8" y1="12" x2="16" y2="12"/>
+                  </svg>
+                  Birinchi modulni yaratish
+                </button>
+              </div>
+            ) : (
+              <div className="modules-timeline">
+                {modules.map((module, index) => (
+                  <div key={module.id} className={`module-timeline-item ${module.is_active ? 'active' : module.is_finished ? 'finished' : 'upcoming'}`}>
+                    {/* Timeline connector */}
+                    {index < modules.length - 1 && (
+                      <div className="timeline-connector"></div>
+                    )}
+                    
+                    {/* Module card */}
+                    <div className="beautiful-module-card">
+                      {/* Card header with status indicator */}
+                      <div className="module-card-header">
+                        <div className="module-number">
+                          <span>{index + 1}</span>
+                        </div>
+                        <div className="module-info">
+                          <h3>{module.name}</h3>
+                          <p className="module-created">
+                            Yaratilgan: {new Date(module.created_at).toLocaleDateString('uz-UZ')}
+                          </p>
+                        </div>
+                        <div className={`module-status-indicator ${module.is_active ? 'active' : module.is_finished ? 'finished' : 'inactive'}`}>
+                          {module.is_active ? (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                              <circle cx="12" cy="12" r="10"/>
+                              <path d="M9,12l2,2 4,-4"/>
+                            </svg>
+                          ) : module.is_finished ? (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                              <polyline points="22,4 12,14.01 9,11.01"/>
+                            </svg>
+                          ) : (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                              <circle cx="12" cy="12" r="10"/>
+                              <polyline points="8,12 12,16 16,12"/>
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Status badge */}
+                      <div className="module-status-section">
+                        <span className={`beautiful-status-badge ${module.is_active ? 'active' : module.is_finished ? 'finished' : 'inactive'}`}>
+                          {module.is_active ? (
+                            <>
+                              <span className="status-dot"></span>
+                              Faol modul
+                            </>
+                          ) : module.is_finished ? (
+                            <>
+                              <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                              </svg>
+                              Tugatilgan
+                            </>
+                          ) : (
+                            <>
+                              <span className="status-dot"></span>
+                              Kutilmoqda
+                            </>
+                          )}
+                        </span>
+                      </div>
+
+                      {/* Module stats */}
+                      <div className="module-stats">
+                        <div className="stat-item">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                          </svg>
+                          <span>{lessons.filter(l => l.module_id === module.id).length} dars</span>
+                        </div>
+                        <div className="stat-item">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <circle cx="12" cy="12" r="10"/>
+                            <circle cx="12" cy="12" r="6"/>
+                            <circle cx="12" cy="12" r="2"/>
+                          </svg>
+                          <span>{criteria.filter(c => c.module_id === module.id).length} mezon</span>
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="module-actions-beautiful">
+                        <button 
+                          onClick={() => handleManageModule(module)}
+                          className="action-btn primary"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                            <path d="M2 17l10 5 10-5"/>
+                            <path d="M2 12l10 5 10-5"/>
+                          </svg>
+                          Boshqarish
+                        </button>
+                        
+                        {module.is_active && (
+                          <button 
+                            onClick={() => handleFinishModule(module)} 
+                            className="action-btn warning"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                              <polyline points="20,6 9,17 4,12"/>
+                            </svg>
+                            Tugatish
+                          </button>
+                        )}
+                        
+                        {!module.is_finished && (
+                          <button 
+                            onClick={() => handleDeleteModule(module)} 
+                            className="action-btn danger"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                              <polyline points="3,6 5,6 21,6"/>
+                              <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                            </svg>
+                            O'chirish
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -782,8 +903,38 @@ const GroupDetailPage = () => {
         {activeTab === 'lessons' && (
           <div className="lessons-section">
             <div className="section-header">
-              <h2>Darslar</h2>
-              <button onClick={handleStartLesson} className="add-btn">
+              <div className="lessons-header-left">
+                <h2>Darslar</h2>
+                <div className="module-selector-lessons">
+                  <label>Modul:</label>
+                  <select 
+                    value={selectedModuleForLessons?.id || ''} 
+                    onChange={(e) => {
+                      const module = modules.find(m => m.id === parseInt(e.target.value));
+                      setSelectedModuleForLessons(module);
+                      if (module) {
+                        loadLessons(module.id);
+                      }
+                    }}
+                    className="module-dropdown-lessons"
+                  >
+                    <option value="">Modulni tanlang</option>
+                    {modules.map(module => (
+                      <option key={module.id} value={module.id}>
+                        {module.name} {module.is_active ? '(Faol)' : module.is_finished ? '(Tugatilgan)' : '(Nofaol)'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <button 
+                onClick={handleStartLesson} 
+                className="add-btn"
+                disabled={!selectedModuleForLessons?.is_active || lessons.some(l => l.is_active)}
+                title={!selectedModuleForLessons ? 'Avval modulni tanlang' : 
+                       !selectedModuleForLessons.is_active ? 'Faqat faol modulda dars boshlash mumkin' : 
+                       lessons.some(l => l.is_active) ? 'Joriy darsni tugatib, yangi dars boshlang' : ''}
+              >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <circle cx="12" cy="12" r="10"/>
                   <line x1="12" y1="8" x2="12" y2="16"/>
@@ -793,30 +944,69 @@ const GroupDetailPage = () => {
               </button>
             </div>
 
-            <div className="lessons-list">
-              {lessons.map(lesson => (
-                <div key={lesson.id} className={`lesson-card ${lesson.is_active ? 'active' : ''}`}>
-                  <div className="lesson-info">
-                    <h4>{lesson.name}</h4>
-                    <span className={`status-badge ${lesson.is_active ? 'active' : 'finished'}`}>
-                      {lesson.is_active ? 'Faol' : 'Tugatilgan'}
-                    </span>
+            {!selectedModuleForLessons ? (
+              <div className="no-module-selected-lessons">
+                <div className="select-module-prompt">
+                  <div className="prompt-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                    </svg>
                   </div>
-                  <div className="lesson-actions">
-                    {lesson.is_active && (
-                      <>
-                        <button onClick={() => handleFinishLesson(lesson)} className="finish-btn">
-                          Darsni tugatish
-                        </button>
-                        <button onClick={() => handleDeleteLesson(lesson)} className="delete-btn">
-                          O'chirish
-                        </button>
-                      </>
-                    )}
-                  </div>
+                  <h4>Modulni tanlang</h4>
+                  <p>Darslarni ko'rish uchun yuqoridagi ro'yxatdan modulni tanlang</p>
                 </div>
-              ))}
-            </div>
+              </div>
+            ) : lessons.length === 0 ? (
+              <div className="empty-lessons">
+                <div className="empty-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                  </svg>
+                </div>
+                <h4>Hali darslar yo'q</h4>
+                <p>{selectedModuleForLessons.name} uchun hali darslar boshlanmagan</p>
+                {selectedModuleForLessons.is_active && (
+                  <button 
+                    onClick={handleStartLesson}
+                    className="start-first-lesson-btn"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="12" y1="8" x2="12" y2="16"/>
+                      <line x1="8" y1="12" x2="16" y2="12"/>
+                    </svg>
+                    Birinchi darsni boshlash
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="lessons-list">
+                {lessons.map(lesson => (
+                  <div key={lesson.id} className={`lesson-card ${lesson.is_active ? 'active' : ''}`}>
+                    <div className="lesson-info">
+                      <h4>{lesson.name}</h4>
+                      <span className={`status-badge ${lesson.is_active ? 'active' : 'finished'}`}>
+                        {lesson.is_active ? 'Faol' : 'Tugatilgan'}
+                      </span>
+                    </div>
+                    <div className="lesson-actions">
+                      {lesson.is_active && (
+                        <>
+                          <button onClick={() => handleFinishLesson(lesson)} className="finish-btn">
+                            Darsni tugatish
+                          </button>
+                          <button onClick={() => handleDeleteLesson(lesson)} className="delete-btn">
+                            O'chirish
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -826,7 +1016,11 @@ const GroupDetailPage = () => {
             <div className="section-header">
               <h2>Reyting jadvali</h2>
               <div className="grading-controls">
-                <button onClick={startBulkGrading} className="grade-btn bulk">
+                <button 
+                  onClick={startBulkGrading} 
+                  className="grade-btn bulk"
+                  disabled={!activeModule || !lessons.find(l => l.is_active) || criteria.length === 0}
+                >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path d="M9 12l2 2 4-4"/>
                     <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"/>
@@ -866,7 +1060,7 @@ const GroupDetailPage = () => {
                   ))}
                 </div>
                 <div className="bulk-actions">
-                  <button onClick={submitBulkGrades} className="submit-btn">Bahoларni saqlash</button>
+                  <button onClick={submitBulkGrades} className="submit-btn">Baholarni saqlash</button>
                   <button onClick={() => setGradingMode(null)} className="cancel-btn">Bekor qilish</button>
                 </div>
               </div>
@@ -909,6 +1103,7 @@ const GroupDetailPage = () => {
                   <button 
                     onClick={() => startIndividualGrading(student)}
                     className="grade-individual-btn"
+                    disabled={!activeModule || !lessons.find(l => l.is_active) || criteria.length === 0}
                   >
                     Baholash
                   </button>
